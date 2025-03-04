@@ -1,0 +1,13 @@
+
+- download and unzip archive
+- open anaconda prompt
+- cd <package-folder>
+- conda deactivate
+- conda create -n <envname>
+- conda activate <envname>
+- conda install pip
+- pip install .
+
+Use by opening napari in the environment, for example by running the command :
+- napari
+
