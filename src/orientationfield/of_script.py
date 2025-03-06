@@ -112,7 +112,7 @@ def compute_nematic_field(
         if viewer is not None:
             instructions = QMessageBox()
             instructions.setText("You seem to be using the nematic field computation on an RGB or RGBA image. Please convert to grayscale before using the tool.")
-            instructions.setWindowTitle('Instructions')
+            instructions.setWindowTitle('Warning')
             instructions.exec()
         else:
             raise ValueError("You seem to be using the nematic field computation on an RGB or RGBA image. Please convert to grayscale before using the tool.")
