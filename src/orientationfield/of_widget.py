@@ -1,4 +1,4 @@
-"""Nematic field widget module.
+"""OrientationField widget module.
 """
 from qtpy.QtCore import Qt
 import napari._qt.layer_controls.qt_colormap_combobox
@@ -18,6 +18,10 @@ from .of_script import compute_nematic_field, draw_nematic_field_svg, find_defec
 
 
 def embed(wid):
+    """Create GUI elements specific to a widget. 
+    Can't be a method because _do_all relies on the magicgui decorator, 
+    which doesn't work well inside class definitions.
+    """
     @magicgui(
         call_button=False,
         image={'label':'Image'}
@@ -25,7 +29,6 @@ def embed(wid):
     def _do_all(
         image:Image
     ):
-        """Main plugin widget. Deleted on import."""
         colormap = wid.colormapselect.currentData()
         if wid.colortype.currentData() == "fixed":
             custom_kwargs = f"color:{tuple(wid.colorswatch._color)}"
@@ -58,9 +61,7 @@ def embed(wid):
                 mode=mode
             )
 
-
     def _save_as_csv():
-        """Save handler for main widget. Deleted on import."""
         file = QFileDialog.getSaveFileName(filter="napari builtin points (*.csv)")
         if file[0] == '': return 
         img = wid.imgCombobox.currentData()
@@ -75,6 +76,7 @@ def embed(wid):
 
 
 class DoAllWidget(QWidget):
+    """OrientationField Widget. Contains all main features of the of_script scripting module."""
 
     def __init__(self, napari_viewer: "napari.viewer.Viewer"):
         super().__init__()

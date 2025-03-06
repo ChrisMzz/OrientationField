@@ -1,3 +1,4 @@
+"""OrientationField utility functions for computation of the nematic field."""
 import numpy as np
 import skimage as sk
 from scipy.signal import convolve

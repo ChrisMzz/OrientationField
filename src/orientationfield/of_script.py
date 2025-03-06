@@ -1,4 +1,4 @@
-"""Nematic field scripting module.
+"""OrientationField scripting module. Many functions in here refer to the exact term, that is "nematic field".
 """
 from typing import overload
 from napari import Viewer
@@ -186,8 +186,8 @@ def extract_nematic_points_layer(
     Example:
         >>> viewer.add_image(img_array) # img_array is a (h,w) array
         >>> img_layer = viewer.layers[-1] # get the corresponding Image layer
-        >>> nf_script.compute_nematic_field(img_layer, sigma=3.0, cutoff_ratio=2.0, decolorize=False)
-        >>> points = nf_script.extract_nematic_points_layer(img_layer, box_size=8, return_early=True)
+        >>> of_script.compute_nematic_field(img_layer, sigma=3.0, cutoff_ratio=2.0, decolorize=False)
+        >>> points = of_script.extract_nematic_points_layer(img_layer, box_size=8, return_early=True)
     """
 
     #try:     param_names = [param.name for param in params] 
@@ -256,7 +256,7 @@ def draw_nematic_field_svg(
         custom_kwargs (str): String of custom keyword arguments passed to `viewer.add_shapes` on layer generation. Keywords should be specified in the format 'arg:val' seperated by '-', without spaces. Ignores the color argument explained previously.
     
     Example:
-        >>> nemfield = nf_script.draw_nematic_field_svg(img, box_size=8, custom_kwargs:'edge_color:angle-edge_colormap:hsv')
+        >>> nemfield = of_script.draw_nematic_field_svg(img, box_size=8, custom_kwargs:'edge_color:angle-edge_colormap:hsv')
     """
     #length_scale=1.5
 
@@ -386,27 +386,29 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
         return res
 
     name = points.metadata["name"]
-    points_list_normalised = [(point[0]//box_size, point[1]//box_size) for point in points.data]
+    # add 1 for padding
+    points_list_normalised = [(point[0]//box_size+1, point[1]//box_size+1) for point in points.data]
     points_list = [list(point) for point in points.data]
 
     h,w = points.metadata["shape"]
-    img = np.zeros((h//box_size, w//box_size))
+    img = np.zeros((h//box_size+2, w//box_size+2)) # add 2 for padding
 
     for e,point in enumerate(points_list_normalised):
         if points.properties["norm"][e] < thresh:
             img[point] = 1
     clusters = measure.label(np.array(img, dtype=np.int32))
-    img_contour = np.zeros((h//box_size, w//box_size))
-    img_edges_small = np.zeros((h//box_size, w//box_size))
+    img_contour = np.zeros((h//box_size+2, w//box_size+2))
+    img_edges_small = np.zeros((h//box_size+2, w//box_size+2))
     properties = {"value":[], "color":[]}
 
     props = []
     edge_props = []
     for k in range(1,np.max(clusters)+1):
         cluster = (clusters==k)*offset # arbitrary negative offset for edge detection and debugging
-        if np.any(cluster[::(h//box_size-1)]==offset) or np.any(cluster[:,::(w//box_size-1)]==offset): # if cluster is on edge
+        # edge detection accounts for box padding
+        if np.any(cluster[1::(h//box_size-1)]==offset) or np.any(cluster[:,1::(w//box_size-1)]==offset):
             edge_props.append(np.array([
-                _find_og_position(*p)
+                _find_og_position(*(p-1))
                 for p in measure.find_contours(cluster, positive_orientation='low', fully_connected='low')[0]
             ]))
             img_edges_small += k*(clusters==k)
@@ -415,10 +417,10 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
         angles = []
         contour = []
         for e,p in enumerate(measure.find_contours(cluster, positive_orientation='low', fully_connected='low')[0]):
-            contour.append(_find_og_position(*p))
-            # find out on which side of the boundary the cluster is
-            p0low, p1low = int(p[0]), int(p[1])
-            p0high, p1high = int(p[0]+.5), int(p[1]+.5)
+            contour.append(_find_og_position(*(p-1)))
+            # find out on which side of the boundary the cluster is (accounts for padding)
+            p0low, p1low = int(p[0]-1), int(p[1]-1)
+            p0high, p1high = int(p[0]-.5), int(p[1]-.5)
             if cluster[p0low, p1low] == offset:
                 cluster[p0high,p1high] = e+1
                 r,c = _find_og_position(p0high,p1high)
@@ -459,8 +461,8 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
         edges_img[r-box_size//2:r+(box_size+1)//2,c-box_size//2:c+(box_size+1)//2] = np.ones(4)*(img_edges_small[p0,p1]>0) # hex_to_rgba here also ?
     
     if mode == "squares": 
-        viewer.add_image(np.array(clusters_img, dtype=np.uint8), blending='translucent', opacity=0.7, name=f"{name} - cluster defects")
-        viewer.add_image(np.array(edges_img, dtype=np.uint8), blending='translucent', opacity=0.7, name=f"{name} - edge defects")
+        viewer.add_image(np.array(clusters_img, dtype=np.uint8), blending='translucent', opacity=0.7, name=f"{name} - clusters")
+        viewer.add_image(np.array(edges_img, dtype=np.uint8), blending='translucent', opacity=0.7, name=f"{name} - edge clusters")
         # transtyping to uint8 because SVG export crashes otherwise
     
     # clean up edge_props
@@ -469,7 +471,7 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
     clusters_shapes = viewer.add_shapes(
         [rdp_polygon(prop[:-1],rdp_eps) for prop in props], # replace props by props[:3] and it does work, somehow
         shape_type='polygon', face_color=properties['color'], properties=properties,
-        text={'string': '{value}', 'anchor': 'center', 'size': 8 }, edge_width=0, name=f"{name} - defects")
+        text={'string': '{value}', 'anchor': 'center', 'size': 8 }, edge_width=0, name=f"{name} - clusters")
     edge_clusters_shapes = viewer.add_shapes(
         [rdp_polygon(prop[:-1], rdp_eps) for prop in edge_props], shape_type='polygon', edge_width=0, name=f"{name} - edge clusters") 
     
@@ -568,8 +570,9 @@ def find_defects(
     else:
         clusters.add_ellipses(box_defects, face_color=box_properties["color"])
         N = len(box_properties["value"])
-        clusters.properties["value"][-N:] = box_properties["value"]
-        clusters.properties["color"][-N:] = box_properties["color"]
+        if N > 0:
+            clusters.properties["value"][-N:] = box_properties["value"]
+            clusters.properties["color"][-N:] = box_properties["color"]
     clusters.refresh_text()
     clusters.refresh_colors()
     clusters.refresh()
