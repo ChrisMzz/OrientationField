@@ -15,7 +15,7 @@ from magicgui import magicgui
 from magicgui.widgets import FunctionGui
 import pathlib
 import numpy as np
-from qtpy.QtWidgets import QFileDialog, QWidget
+from qtpy.QtWidgets import QFileDialog, QWidget, QMessageBox
 from qtpy import uic
 from skimage import io, measure
 import orientationfield.nematicfield as nf
@@ -109,7 +109,14 @@ def compute_nematic_field(
     if len(img.data.shape) > 2 and img.data.shape[-1] in [3,4]:
         # if 3 or 4 is the number of images in your image sequence, please transpose your image so that 
         # time along the first axis
-        raise IndexError("You seem to be using the nematic field computation on an RGB or RGBA image. Please convert to grayscale before using the tool.")
+        if viewer is not None:
+            instructions = QMessageBox()
+            instructions.setText("You seem to be using the nematic field computation on an RGB or RGBA image. Please convert to grayscale before using the tool.")
+            instructions.setWindowTitle('Instructions')
+            instructions.exec()
+        else:
+            raise ValueError("You seem to be using the nematic field computation on an RGB or RGBA image. Please convert to grayscale before using the tool.")
+        return False
     if decolorize: img_data = np.array(np.mean(img.data,axis=decolorize_axis), dtype=np.float64) # RGBA channel
     else: img_data = img.data
     if normalize_options == 'total':
@@ -121,6 +128,7 @@ def compute_nematic_field(
         nem_field = np.array([nf.nematic_field(frame, sigma=sigma, cutoff_ratio=cutoff_ratio) for frame in tqdm(normalized_img if normalize else img_data, desc='Computing...', leave=None)])
     else: nem_field = nf.nematic_field(normalized_img if normalize else img_data, sigma=sigma, cutoff_ratio=cutoff_ratio)
     img.metadata["nematic_field"] = nem_field
+    return True
 
 @magicgui(
     call_button='Preview Kernel',
@@ -194,7 +202,10 @@ def extract_nematic_points_layer(
     #except : param_names = [param for param in params]
     param_names = ["Qxx", "Qxy", "norm", "angle"]
     # convert shapes to labels
-    if "nematic_field" not in img.metadata.keys(): compute_nematic_field(img)
+    if "nematic_field" not in img.metadata.keys(): 
+        success = compute_nematic_field(img)
+        if not success:
+            return False
     nem_field = img.metadata["nematic_field"]
     if mask is None: mask_data = np.ones(nem_field.shape[:-2])
     else: mask_data = mask.data
@@ -226,6 +237,7 @@ def extract_nematic_points_layer(
         new_layer.save(os.path.join(str(folder),name,f'{name} - t{t}.csv')) # save to pathlib folder with its current default name
         del viewer.layers[-1]
     del viewer.layers[viewer.layers.index(points)]
+    return True
 
 
 @magicgui(
@@ -312,7 +324,10 @@ def draw_nematic_field_svg(
         return nems, properties
 
     name = img.name
-    if "nematic_field" not in img.metadata.keys(): compute_nematic_field(img) # uses current values in GUI
+    if "nematic_field" not in img.metadata.keys(): 
+        success = compute_nematic_field(img) # uses current values in GUI
+        if not success:
+            return False
     img.metadata["box_size"] = box_size
     nem_field = img.metadata["nematic_field"]
     if len(nem_field.shape) > 4:
@@ -366,7 +381,6 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
         Points: Points layer of defects (points in red).
     """
     rdp_eps = 1
-    if not 'norm' in points.properties: raise Exception('Norm was not selected when making this layer')
     box_size = points.metadata["box_size"]
     t_crop, l_crop = points.metadata["offset"]
     if thresh == -1: thresh = draw_nematic_field_svg.__signature__.parameters["thresh"].default
@@ -542,7 +556,7 @@ def find_defects(
     mode:str='simplified'
 ):
     if len(img.data.shape) > 2: 
-        warnings.warn("Defect detection cannot be automated on image sequences. Please compute defects for each frame separately, using Split Stack or a separate script.")
+        warnings.warn("Defect detection can't be automated on image sequences. Please compute defects for each frame separately, using Split Stack or a separate script.")
         return 
     if thresh == -1: thresh = draw_nematic_field_svg.__signature__.parameters["thresh"].default
     if box_size == -1: box_size = draw_nematic_field_svg.__signature__.parameters["box_size"].default
