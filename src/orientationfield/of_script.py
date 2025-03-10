@@ -471,8 +471,8 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
     edges_img = np.zeros((h,w,4), dtype=np.int32)
     for (p0,p1) in nf.loop_over_positions((h//box_size, w//box_size)):
         r,c = _find_og_position(p0,p1)
-        clusters_img[r-box_size//2:r+(box_size+1)//2,c-box_size//2:c+(box_size+1)//2] = np.zeros(4) if clusters[p0,p1]-1 < 0 else hex_to_rgba(properties["color"][clusters[p0,p1]-1])
-        edges_img[r-box_size//2:r+(box_size+1)//2,c-box_size//2:c+(box_size+1)//2] = np.ones(4)*(img_edges_small[p0,p1]>0) # hex_to_rgba here also ?
+        clusters_img[r-box_size//2:r+(box_size+1)//2,c-box_size//2:c+(box_size+1)//2] = np.zeros(4) if clusters[p0+1,p1+1]-1 < 0 else hex_to_rgba(properties["color"][clusters[p0+1,p1+1]-1])
+        edges_img[r-box_size//2:r+(box_size+1)//2,c-box_size//2:c+(box_size+1)//2] = np.ones(4)*(img_edges_small[p0+1,p1+1]>0)*255 # hex_to_rgba here also ?
     
     if mode == "squares": 
         viewer.add_image(np.array(clusters_img, dtype=np.uint8), blending='translucent', opacity=0.7, name=f"{name} - clusters")
@@ -572,15 +572,16 @@ def find_defects(
     if mode == "squares": 
         del viewer.layers[viewer.layers.index(clusters)]
         del viewer.layers[viewer.layers.index(edge_clusters)]
-        clusters = viewer.add_shapes(
-            box_defects, 
-            properties=box_properties, 
-            shape_type='ellipse', 
-            face_color=box_properties["color"], 
-            text={'string': '{value}', 'anchor': 'center', 'size': 8 },
-            edge_width=0,
-            name=f"{img.name} - points defects"
-            )
+        if len(box_properties["color"]) > 0:
+            clusters = viewer.add_shapes(
+                box_defects, 
+                properties=box_properties, 
+                shape_type='ellipse', 
+                face_color=box_properties["color"], 
+                text={'string': '{value}', 'anchor': 'center', 'size': 8 },
+                edge_width=0,
+                name=f"{img.name} - points defects"
+                )
     else:
         clusters.add_ellipses(box_defects, face_color=box_properties["color"])
         N = len(box_properties["value"])
