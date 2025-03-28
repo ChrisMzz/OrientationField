@@ -12,11 +12,10 @@ from magicgui import magicgui
 import pathlib
 from qtpy.QtWidgets import QFileDialog, QWidget
 from qtpy import uic
+from .of_script import compute_nematic_field, draw_nematic_field_svg, find_defects, extract_nematic_points_layer
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import matplotlib as mpl
-from .of_script import compute_nematic_field, draw_nematic_field_svg, find_defects, extract_nematic_points_layer
-
 
 
 
@@ -138,10 +137,9 @@ class DoAllWidget(QWidget):
         save_as.clicked.connect(_save_as_csv)
         save_as.move(10,345)
         save_as.resize(120,20)
-
         fig, ax = plt.subplots(figsize=(2, 0.5), layout='constrained')
         fig.patch.set_facecolor('#00000000')
-        self.defectsColormap = self.bottomLayout.insertWidget(1,mpl.backends.backend_qtagg.FigureCanvas(fig))
+        self.defectsColormap = self.bottomLayout.insertWidget(3,mpl.backends.backend_qtagg.FigureCanvas(fig))
         cmap = ListedColormap(
             ['#00ff30', '#00ddd1', '#6666ff', '#999999', '#ff6666', '#dd7600', '#ffd700']
         )
@@ -149,8 +147,8 @@ class DoAllWidget(QWidget):
         cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=ax, orientation='horizontal')
         cbar.outline.set_edgecolor("#00000000")
         cbar.ax.xaxis.set_tick_params(color="white")
+        cbar.ax.axes.set_xticks([-1.5, -1, -0.5, 0, 0.5, 1, 1.5], ["-1.5", "-1", "-0.5", "0", "0.5", "1", "1.5"])
         plt.setp(plt.getp(cbar.ax.axes, 'xticklabels'), color="white")
-        
         
 
         self.lengthsCheckbox.setChecked(True)
