@@ -475,8 +475,8 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
         edges_img[r-box_size//2:r+(box_size+1)//2,c-box_size//2:c+(box_size+1)//2] = np.ones(4)*(img_edges_small[p0+1,p1+1]>0)*255 # hex_to_rgba here also ?
     
     if mode == "squares": 
-        viewer.add_image(np.array(clusters_img, dtype=np.uint8), blending='translucent', opacity=0.7, name=f"{name} - clusters")
-        viewer.add_image(np.array(edges_img, dtype=np.uint8), blending='translucent', opacity=0.7, name=f"{name} - edge clusters")
+        viewer.add_image(np.array(clusters_img, dtype=np.uint8), blending='translucent', opacity=1, name=f"{name} - clusters")
+        viewer.add_image(np.array(edges_img, dtype=np.uint8), blending='translucent', opacity=1, name=f"{name} - edge clusters")
         # transtyping to uint8 because SVG export crashes otherwise
     
     # clean up edge_props
@@ -484,10 +484,10 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
 
     clusters_shapes = viewer.add_shapes(
         [rdp_polygon(prop[:-1],rdp_eps) for prop in props], # replace props by props[:3] and it does work, somehow
-        shape_type='polygon', face_color=properties['color'], properties=properties,
+        shape_type='polygon', face_color=properties['color'], properties=properties, opacity=1,
         text={'string': '{value}', 'anchor': 'center', 'size': 8 }, edge_width=0, name=f"{name} - clusters")
     edge_clusters_shapes = viewer.add_shapes(
-        [rdp_polygon(prop[:-1], rdp_eps) for prop in edge_props], shape_type='polygon', edge_width=0, name=f"{name} - edge clusters") 
+        [rdp_polygon(prop[:-1], rdp_eps) for prop in edge_props], shape_type='polygon', opacity=1, edge_width=0, name=f"{name} - edge clusters") 
     
     return clusters_shapes, edge_clusters_shapes
 
