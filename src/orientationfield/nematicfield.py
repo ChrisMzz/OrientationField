@@ -294,37 +294,3 @@ def extract_points(nem_field:np.ndarray, mask:np.ndarray, box_size:int, params:l
     return total_points, total_properties
 
 
-
-
-if __name__ == '__main__':
-
-    # for __main__ testing purposes
-    h,w = 300, 400
-    n = 400
-
-    #IMG = make_random_line_image(h,w,n)
-    #plt.imshow(IMG)
-    #plt.show()
-    #sk.io.imsave('test3.png',IMG)
-    #A = tesselate(IMG, 3,4)
-
-
-    IMG = 1*(sk.io.imread('dessin.png') > 0)
-    IMG = sk.io.imread('muscle_hard.png')
-    IMG = IMG/np.max(IMG)
-    if len(IMG.shape) > 2: IMG = sum(IMG.transpose(2,0,1))
-    #IMG = pr.thresh(IMG, 0.5)
-    
-    nem_field = nematic_field(IMG, sigma=0.5, cutoff_ratio=2) # these parameters are very important to control accuracy
-    nem_field_image = draw_nematic_field(nem_field, 27)
-    
-
-    #fig, (ax1,ax2) = plt.subplots(1,2)
-    #ax1.imshow(IMG)
-    #ax2.imshow(nem_field)
-    #plt.show()
-
-    sk.io.imsave('dessin_p.tif',np.array([IMG, nem_field_image/np.max(nem_field_image)]))
-    #sk.io.imsave('dessin_nems.tif',nem_field)
-    #sk.io.imsave('muscle_test.tif',np.array([IMG, nem_field_image/np.max(nem_field_image)]))
-    #sk.io.imsave('muscle_test_nems.tif',nem_field)

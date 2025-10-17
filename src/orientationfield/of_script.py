@@ -595,6 +595,7 @@ def find_defects(
     
     del viewer.layers[viewer.layers.index(points)]
     del viewer.layers[viewer.layers.index(both)]
+    return (clusters, edge_clusters)
 
 
 

@@ -7,7 +7,7 @@ import napari._qt.layer_controls.qt_shapes_controls
 import napari._qt.widgets.qt_color_swatch
 import napari._qt.widgets.qt_theme_sample
 from qtpy.QtGui import QColor, QMouseEvent
-from napari.layers import Image, Points # for magicgui and selection error handling
+from napari.layers import Image, Points, Shapes # for magicgui and selection error handling
 from magicgui import magicgui
 import pathlib
 from qtpy.QtWidgets import QFileDialog, QWidget
@@ -16,7 +16,7 @@ from .of_script import compute_nematic_field, draw_nematic_field_svg, find_defec
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import matplotlib as mpl
-
+import numpy as np    
 
 
 def embed(wid):
@@ -65,6 +65,23 @@ def embed(wid):
                 mode=mode
             )
         return True
+    
+    def _defects_to_points(defects:tuple[Shapes, Shapes]):
+        """Private method to convert the return statement of `find_defects` into a CSV-exportable structure.
+        Expects `simplified` mode.
+        """
+        def centroid(l):
+            return np.mean(l,axis=0)
+        clusters, edge_clusters = defects
+        properties = {
+            "shape-type":[],
+            "defect-charge":clusters.properties["value"]
+        }
+        points = []
+        for shape_type, d in zip(clusters.shape_type, clusters.data):
+            points.append(centroid(d))
+            properties["shape-type"].append(shape_type)
+        return wid.viewer.add_points(np.array(points), properties=properties)
 
     def _save_as_csv():
         file = QFileDialog.getSaveFileName(filter="napari builtin points (*.csv)")
@@ -74,7 +91,13 @@ def embed(wid):
         name = file[0] if file[0][-4:] == '.csv' else file[0]+".csv"    
         points:Points = extract_nematic_points_layer(img, box_size=box_size, return_early=True)
         points.save(name)
-    
+        del wid.viewer.layers[wid.viewer.layers.index(points)]
+        defects = find_defects(img, box_size=box_size, thresh=wid.threshSpin.value(), mode="simplified")
+        points = _defects_to_points(defects)
+        points.save(name[:-4]+"_defects.csv")
+        del wid.viewer.layers[wid.viewer.layers.index(points)]
+        del wid.viewer.layers[wid.viewer.layers.index(defects[0])]
+        del wid.viewer.layers[wid.viewer.layers.index(defects[1])]
     return _do_all, _save_as_csv
     
 
