@@ -1,25 +1,17 @@
 """OrientationField scripting module. Many functions in here refer to the exact term, that is "nematic field".
 """
 from typing import overload
-from napari import Viewer
-from qtpy.QtCore import Qt
-import napari._qt.layer_controls.qt_colormap_combobox
-import napari._qt.layer_controls.qt_image_controls_base
-import napari._qt.layer_controls.qt_shapes_controls
-import napari._qt.widgets.qt_color_swatch
-import napari._qt.widgets.qt_theme_sample
+import napari
 import warnings
-from qtpy.QtGui import QColor, QMouseEvent
 from napari.layers import Image, Points, Labels # for magicgui and selection error handling
 from magicgui import magicgui
 from magicgui.widgets import FunctionGui
 import pathlib
 import numpy as np
-from qtpy.QtWidgets import QFileDialog, QWidget, QMessageBox
-from qtpy import uic
-from skimage import io, measure
+from qtpy.QtWidgets import QMessageBox
+from skimage import measure
 import orientationfield.nematicfield as nf
-import sys, os
+import os
 import re
 from magicgui.tqdm import tqdm
 
@@ -372,13 +364,13 @@ def draw_nematic_field_svg(
     mode={'visible':False}
 )
 def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
-    """Current (faulty) implementation for finding potential defects. Has to be fined tuned per image, which is very bad. 
+    """Current implementation for finding potential defects.
 
     Args:
-        points (Points): The Points layer, computed after masking (or not).
+        points (Points): The Points layer, computed after potential masking.
 
     Returns:
-        Points: Points layer of defects (points in red).
+        Points: Points layer of defects.
     """
     rdp_eps = 1
     box_size = points.metadata["box_size"]
@@ -474,9 +466,10 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
         clusters_img[r-box_size//2:r+(box_size+1)//2,c-box_size//2:c+(box_size+1)//2] = np.zeros(4) if clusters[p0+1,p1+1]-1 < 0 else hex_to_rgba(properties["color"][clusters[p0+1,p1+1]-1])
         edges_img[r-box_size//2:r+(box_size+1)//2,c-box_size//2:c+(box_size+1)//2] = np.ones(4)*(img_edges_small[p0+1,p1+1]>0)*255 # hex_to_rgba here also ?
     
+    images = []
     if mode == "squares": 
-        viewer.add_image(np.array(clusters_img, dtype=np.uint8), blending='translucent', opacity=1, name=f"{name} - clusters")
-        viewer.add_image(np.array(edges_img, dtype=np.uint8), blending='translucent', opacity=1, name=f"{name} - edge clusters")
+        images.append(viewer.add_image(np.array(clusters_img, dtype=np.uint8), blending='translucent', opacity=1, name=f"{name} - clusters"))
+        images.append(viewer.add_image(np.array(edges_img, dtype=np.uint8), blending='translucent', opacity=1, name=f"{name} - edge clusters"))
         # transtyping to uint8 because SVG export crashes otherwise
     
     # clean up edge_props
@@ -489,7 +482,7 @@ def cluster_defects(points:Points, thresh:float=-1, mode:str='simplified'):
     edge_clusters_shapes = viewer.add_shapes(
         [rdp_polygon(prop[:-1], rdp_eps) for prop in edge_props], shape_type='polygon', opacity=1, edge_width=0, name=f"{name} - edge clusters") 
     
-    return clusters_shapes, edge_clusters_shapes
+    return clusters_shapes, edge_clusters_shapes, images
 
 
 @magicgui(
@@ -555,48 +548,142 @@ def find_defects(
     thresh:float=-1,
     mode:str='simplified'
 ):
-    if len(img.data.shape) > 2: 
-        warnings.warn("Defect detection can't be automated on image sequences. Please compute defects for each frame separately, using Split Stack or a separate script.")
-        return 
+
     if thresh == -1: thresh = draw_nematic_field_svg.__signature__.parameters["thresh"].default
     if box_size == -1: box_size = draw_nematic_field_svg.__signature__.parameters["box_size"].default
     points = extract_nematic_points_layer(img, box_size=box_size, return_early=True)
-    
-    clusters, edge_clusters = cluster_defects(points, thresh, mode=mode)
-    del viewer.layers[viewer.layers.index(points)]
+    if len(img.data.shape) == 3: 
+        all_points, all_properties, metadata = points.data, points.properties, points.metadata
+        metadata["shape"] = metadata["shape"][1:]
+        del viewer.layers[viewer.layers.index(points)]
+        nb_of_points_seen = 0
+        all_images = {"clusters":[], "edge_clusters":[]}
+        all_clusters_data, all_edge_clusters_data = [], []
+        all_clusters_props = {"value":[], "color":[]}
+        for t in np.unique(all_points[:,0]):
+            points_list = all_points[all_points[:,0]==t][:,1:]
+            properties = {
+                k:v[nb_of_points_seen:nb_of_points_seen+len(points_list)] for k,v in all_properties.items()
+            }
+            nb_of_points_seen += len(points_list)
+            points = viewer.add_points(points_list, properties=properties, metadata=metadata)
+            clusters, edge_clusters, images = cluster_defects(points, thresh, mode=mode)
+            if mode == "squares":
+                all_images["clusters"].append(images[0].data)
+                all_images["edge_clusters"].append(images[1].data)
+                del viewer.layers[viewer.layers.index(images[0])]
+                del viewer.layers[viewer.layers.index(images[1])]
+            del viewer.layers[viewer.layers.index(points)]
+            all_clusters_data += [np.c_[t*np.ones(len(shape)),shape] for shape in clusters.data]
+            all_edge_clusters_data + [np.c_[t*np.ones(len(shape)),shape] for shape in edge_clusters.data]
+            all_clusters_props["value"] += list(clusters.properties["value"])
+            all_clusters_props["color"] += list(clusters.properties["color"])
+            del viewer.layers[viewer.layers.index(clusters)]
+            del viewer.layers[viewer.layers.index(edge_clusters)]
+        both = viewer.add_shapes(list(all_clusters_data) + list(all_edge_clusters_data), shape_type='polygon', name=f"{img.name} temp defects layer")
+        points = extract_nematic_points_layer(img, mask=1*(both.to_labels(img.data.shape)==0), box_size=box_size, return_early=True)
+        all_box_defects = []
+        all_box_properties = {"value":[], "color":[]}
+        nb_of_points_seen = 0
+        for t in np.unique(all_points[:,0]):
+            data_t = points.data[points.data[:,0]==t][:,1:]
+            properties = {
+                k:v[nb_of_points_seen:nb_of_points_seen+len(data_t)] for k,v in all_properties.items()
+            }
+            box_defects, box_properties = box_intersection_defects(
+                points_t := viewer.add_points(data_t, properties=properties, metadata=points.metadata)
+            )
+            all_box_defects += [np.array([[t,*d] for d in defect]) for defect in box_defects]
+            all_box_properties["value"] += box_properties["value"]
+            all_box_properties["color"] += box_properties["color"]
+            del viewer.layers[viewer.layers.index(points_t)]
+            nb_of_points_seen += len(data_t)
+        del viewer.layers[viewer.layers.index(both)]
+        del viewer.layers[viewer.layers.index(points)]
 
-    both = viewer.add_shapes(list(clusters.data) + list(edge_clusters.data), shape_type='polygon', name=f"{img.name} temp defects layer")
-
-    points = extract_nematic_points_layer(img, mask=1*(both.to_labels(img.data.shape)==0), box_size=box_size, return_early=True)
-    box_defects, box_properties = box_intersection_defects(points) # dependency on clusters ?
-    if mode == "squares": 
-        del viewer.layers[viewer.layers.index(clusters)]
-        del viewer.layers[viewer.layers.index(edge_clusters)]
-        if len(box_properties["color"]) > 0:
+        if mode == "simplified":
             clusters = viewer.add_shapes(
-                box_defects, 
-                properties=box_properties, 
+                all_clusters_data, 
+                shape_type='polygon', 
+                face_color=all_clusters_props['color'], 
+                properties=all_clusters_props, 
+                opacity=1,
+                text={'string': '{value}', 'anchor': 'center', 'size': 8 }, 
+                edge_width=0, 
+                name=f"{img.name} - clusters"
+            )
+            edge_clusters = viewer.add_shapes(
+                all_edge_clusters_data, 
+                shape_type='polygon', 
+                opacity=1,
+                text={'string': '{value}', 'anchor': 'center', 'size': 8 }, 
+                edge_width=0, 
+                name=f"{img.name} - edge clusters"
+            )
+            clusters.add_ellipses(
+                all_box_defects, 
+                face_color=all_box_properties["color"]
+            )
+            N = len(all_box_properties["value"])
+            if len(clusters.properties["value"]) == 0:
+                clusters.properties = {"value":all_box_properties["value"], "color":all_box_properties["color"]}
+            elif N > 0:
+                clusters.properties["value"][-N:] = all_box_properties["value"]
+                clusters.properties["color"][-N:] = all_box_properties["color"]
+            clusters.refresh_text()
+            clusters.refresh_colors()
+            clusters.refresh()
+            clusters.text.visible = False
+        else:
+            clusters_img = viewer.add_image(np.array(all_images['clusters'], dtype=np.uint8), blending='translucent', opacity=1, name=f"{img.name} - clusters")
+            edge_clusters_img = viewer.add_image(np.array(all_images['edge_clusters'], dtype=np.uint8), blending='translucent', opacity=1, name=f"{img.name} - edge clusters")
+            viewer.add_shapes(
+                all_box_defects, 
+                properties=all_box_properties, 
+                metadata=points.metadata, 
                 shape_type='ellipse', 
-                face_color=box_properties["color"], 
-                text={'string': '{value}', 'anchor': 'center', 'size': 8 },
-                edge_width=0,
+                face_color=all_box_properties["color"], 
+                text={'string': '{value}', 'anchor': 'center', 'size': 8 }, 
+                edge_width=0, 
                 name=f"{img.name} - points defects"
-                )
+            )
     else:
-        clusters.add_ellipses(box_defects, face_color=box_properties["color"])
-        N = len(box_properties["value"])
-        if N > 0:
-            clusters.properties["value"][-N:] = box_properties["value"]
-            clusters.properties["color"][-N:] = box_properties["color"]
-    clusters.refresh_text()
-    clusters.refresh_colors()
-    clusters.refresh()
-    clusters.text.visible = False
-    
-    del viewer.layers[viewer.layers.index(points)]
-    del viewer.layers[viewer.layers.index(both)]
-    return (clusters, edge_clusters)
+        clusters, edge_clusters, images = cluster_defects(points, thresh, mode=mode)
+        del viewer.layers[viewer.layers.index(points)]
 
+        both = viewer.add_shapes(list(clusters.data) + list(edge_clusters.data), shape_type='polygon', name=f"{img.name} temp defects layer")
+
+        points = extract_nematic_points_layer(img, mask=1*(both.to_labels(img.data.shape)==0), box_size=box_size, return_early=True)
+        box_defects, box_properties = box_intersection_defects(points) # dependency on clusters ?
+        if mode == "squares": 
+            del viewer.layers[viewer.layers.index(clusters)]
+            del viewer.layers[viewer.layers.index(edge_clusters)]
+            if len(box_properties["color"]) > 0:
+                clusters = viewer.add_shapes(
+                    box_defects, 
+                    properties=box_properties, 
+                    shape_type='ellipse', 
+                    face_color=box_properties["color"], 
+                    text={'string': '{value}', 'anchor': 'center', 'size': 8 },
+                    edge_width=0,
+                    name=f"{img.name} - points defects"
+                    )
+        else:
+            clusters.add_ellipses(box_defects, face_color=box_properties["color"])
+            N = len(box_properties["value"])
+            if len(clusters.properties["value"]) == 0:
+                clusters.properties = {"value":box_properties["value"], "color":box_properties["color"]}
+            elif N > 0:
+                clusters.properties["value"][-N:] = box_properties["value"]
+                clusters.properties["color"][-N:] = box_properties["color"]
+        clusters.refresh_text()
+        clusters.refresh_colors()
+        clusters.refresh()
+        clusters.text.visible = False
+        
+        del viewer.layers[viewer.layers.index(points)]
+        del viewer.layers[viewer.layers.index(both)]
+    return (clusters, edge_clusters)
 
 
     

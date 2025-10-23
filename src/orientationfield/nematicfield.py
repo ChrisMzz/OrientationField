@@ -285,7 +285,7 @@ def extract_points(nem_field:np.ndarray, mask:np.ndarray, box_size:int, params:l
     if len(nem_field.shape) > 4:
         total_points, total_properties = [], {param:[] for param in params}
         for t in _tqdm(range(len(nem_field)), desc='Generating Points...', leave=None):
-            points, properties = _make_points_for_frame(nem_field[t], mask[t])
+            points, properties = _make_points_for_frame(nem_field[t], np.unstack(mask[slice(t,t+1)])[0])
             total_points += [[t]+p for p in points]
             for param_name in params: total_properties[param_name] += properties[param_name]
     else:

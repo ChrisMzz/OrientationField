@@ -1,9 +1,9 @@
 """OrientationField widget module.
 """
 from qtpy.QtCore import Qt
-import napari._qt.layer_controls.qt_colormap_combobox
-import napari._qt.layer_controls.qt_image_controls_base
-import napari._qt.layer_controls.qt_shapes_controls
+from napari._qt.layer_controls.widgets.qt_colormap_control import QtColormapComboBox
+from napari._qt.widgets.qt_color_swatch import QColorSwatchEdit
+from napari.utils.colormaps import ALL_COLORMAPS
 import napari._qt.widgets.qt_color_swatch
 import napari._qt.widgets.qt_theme_sample
 from qtpy.QtGui import QColor, QMouseEvent
@@ -33,7 +33,13 @@ def embed(wid):
     ):
         colormap = wid.colormapselect.currentData()
         if wid.colortype.currentData() == "fixed":
-            custom_kwargs = f"color:{tuple(wid.colorswatch._color)}"
+            color = wid.colorswatch._color
+            if type(color) == "str":
+                custom_kwargs = f"color:{wid.colorswatch._color}"
+            else:
+                custom_kwargs = f"color:{
+                    "#"+ "".join([("0"+hex(int(c))[2:])[-2:] for c in 255*color])
+                }"
         else:
             custom_kwargs = f"color:{wid.colortype.currentData()}-colormap:{colormap}"
         # edge width ?
@@ -120,9 +126,9 @@ class DoAllWidget(QWidget):
 
 
         # CUSTOM COLOR WIDGETS --
-        self.colormapselect = napari._qt.layer_controls.qt_colormap_combobox.QtColormapComboBox(None)
+        self.colormapselect = QtColormapComboBox(None)
         self.rightLayout.insertWidget(10,self.colormapselect)
-        for name, cm in napari._qt.layer_controls.qt_image_controls_base.AVAILABLE_COLORMAPS.items():
+        for name, cm in ALL_COLORMAPS.items():
             self.colormapselect.addItem(cm._display_name, name)
 
         def mouseReleaseEvent(obj, event: QMouseEvent):
@@ -131,7 +137,7 @@ class DoAllWidget(QWidget):
                 popup = napari._qt.widgets.qt_color_swatch.QColorPopup(obj, initial)
                 popup.colorSelected.connect(obj.setColor)
                 popup.show()
-        colorpicker = napari._qt.layer_controls.qt_shapes_controls.QColorSwatchEdit(None, initial_color=[0,0,1,1])
+        colorpicker = QColorSwatchEdit(None, initial_color=[0,0,1,1])
         self.rightLayout.insertWidget(10,colorpicker)
         self.colorswatch = colorpicker.children()[-1]
         self.colorswatch.mouseReleaseEvent = lambda event : mouseReleaseEvent(self.colorswatch, event)
