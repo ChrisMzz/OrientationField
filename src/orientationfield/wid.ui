@@ -204,7 +204,7 @@
      <item>
       <widget class="QLabel" name="label">
        <property name="text">
-        <string>threhold</string>
+        <string>threshold</string>
        </property>
       </widget>
      </item>
