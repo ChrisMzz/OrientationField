@@ -7,7 +7,7 @@ categories: ["Annotation", "Segmentation", "Acquisition"]
 contributions:
   commands:
     - id: orientationfield.make_qwidget
-      python_name: orientationfield:DoAllWidget
+      python_name: orientationfield:OFWidget
       title: OrientationField Widget
   widgets:
     - command: orientationfield.make_qwidget

@@ -28,7 +28,7 @@ def embed(wid):
         call_button=False,
         image={'label':'Image'}
     )
-    def _do_all(
+    def _of_main(
         image:Image
     ):
         colormap = wid.colormapselect.currentData()
@@ -104,12 +104,12 @@ def embed(wid):
         del wid.viewer.layers[wid.viewer.layers.index(points)]
         del wid.viewer.layers[wid.viewer.layers.index(defects[0])]
         del wid.viewer.layers[wid.viewer.layers.index(defects[1])]
-    return _do_all, _save_as_csv
+    return _of_main, _save_as_csv
     
 
 
 
-class DoAllWidget(QWidget):
+class OFWidget(QWidget):
     """OrientationField Widget. Contains all main features of the of_script scripting module."""
 
     def __init__(self, napari_viewer: "napari.viewer.Viewer"):
@@ -117,9 +117,9 @@ class DoAllWidget(QWidget):
         self.viewer = napari_viewer
         uic.loadUi(pathlib.Path(__file__).parent / "./wid.ui", self)
 
-        _do_all, _save_as_csv = embed(self)
+        _of_main, _save_as_csv = embed(self)
 
-        img_selector = self.viewer.window.add_dock_widget(_do_all)
+        img_selector = self.viewer.window.add_dock_widget(_of_main)
         self.imgCombobox = img_selector.children()[4].children()[1].children()[2]
         self.rightLayout.insertWidget(0, self.imgCombobox)
         self.viewer.window.remove_dock_widget(img_selector)
@@ -182,7 +182,7 @@ class DoAllWidget(QWidget):
 
         self.lengthsCheckbox.setChecked(True)
 
-        self.computeButton.clicked.connect(_do_all)
+        self.computeButton.clicked.connect(_of_main)
         for name, dname in zip(["squares", "simplified"], ["squares", "simplified"]):
             self.defectsCombo.addItem(dname,name)
         
