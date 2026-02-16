@@ -1,0 +1,120 @@
+of_script
+=============
+
+
+.. automodule:: orientationfield.of_script
+    :members:
+
+
+.. I need to add FunctionGUI elements by hand because Sphinx doesn't see them
+
+.. py:function:: compute_nematic_field(img: Image, sigma: float = 3.0, cutoff_ratio: float = 2.0, decolorize: bool = False, decolorize_axis: int = 2, normalize: bool = True, normalize_options: str = "total")
+
+    Compute nematic field of an Image layer ``img``, and stores the result in layer metadata as a ``img.data.shape+(2,2)``-array keyword ``nematic_field``.
+    
+    :param img: the Image layer.
+    :type img: Image
+    :param sigma: Optional. Bandwidth of kernel. Defaults to ``3.0``.
+    :type sigma: float
+    :param decolorize: Whether image has an RGB (or RGBA) channel that needs to be collapsed. Defaults to ``True``.
+    :type decolorize: bool
+    :param decolorize_axis: The axis of the image that has the RGB (or RGBA) channel. Defaults to ``2``.
+    :type decolorize_axis: int
+    :param normalize: Whether to normalize pixel intensity between 0 and 1. Defaults to ``True``.
+    :type normalize: bool
+    :param normalize_options: Type of normalization. ``'total'`` normalization normalizes with respect to the whole image, all channels included (time included) ``'per frame'`` normalizes each slice along the first axis individually. Defaults to ``'total'``.
+    :type normalize_options: str
+    :return: Whether or not the field was computed.
+    :rtype: ``bool``
+
+    Example:
+
+    >>> viewer.add_image(img_array) # img_array is a numpy array
+    >>> img_layer = viewer.layers[-1] # get the corresponding Image layer
+    >>> of_script.compute_nematic_field(img_layer, sigma=3.0, cutoff_ratio=2.0, decolorize=False)
+    >>> nem_field = img_layer.metadata["nematic_field"]
+
+
+.. py:function:: preview_kernel(**kwargs)
+
+    Display and/or return kernels for a given bandwidth and cutoff ratio. Unless specified, uses values in ``compute_nematic_field`` GUI.
+
+    :param sigma: Optional. Bandwidth of the kernel.
+    :type sigma: float
+    :param cutoff_ratio: Optional. Ratio between size of kernel and bandwidth.
+    :type cutoff_ratio: float
+    :param show: Optional. Whether to add the kernel image to the viewer or not. Defaults to True.
+    :type show: bool
+    :return: Kernel (Kxx as first component and Kxy as second component).
+    :rtype: ``ndarray``
+
+
+.. py:function:: extract_nematic_points_layer(img: Image, mask: Labels | None, folder: pathlib.Path, box_size: int = 8, invert_mask: bool = False, return_early: bool = False)
+
+    Generate a points layer for an Image layer, to save to a csv in a specified folder.
+    Points will be positioned in the center of boxes as they would be drawn in ``draw_nematic_field``.
+    To manually set the box size (in case of exterior use of this function), use the ``box_size`` keyword argument.
+
+    For video/multichannel image layers, this function will generate a video of points layers (which can be split later
+    for batch processing).
+
+    If nematic field for the image is not computed, it will be generated with default parameters.
+
+    :param img: Image layer.
+    :type img: Image
+    :param mask: Optional. Labels of mask used to filter which points to include.
+    :type mask: Labels
+    :param folder: Path to folder where the CSV will be saved.
+    :type folder: pathlib.Path
+    :param box_size: Size of the boxes whose centers will be the points of this layer.
+    :type box_size: int
+    :param invert_mask: Whether mask filters in or filters out parts of the image.
+    :type invert_mask: bool
+    :rtype: ``Points`` or ``None``
+
+    Example:
+
+    >>> viewer.add_image(img_array) # img_array is a (h,w) array
+    >>> img_layer = viewer.layers[-1] # get the corresponding Image layer
+    >>> of_script.compute_nematic_field(img_layer, sigma=3.0, cutoff_ratio=2.0, decolorize=False)
+    >>> points = of_script.extract_nematic_points_layer(img_layer, box_size=8, return_early=True)
+
+
+.. py:function:: draw_nematic_field_svg(img: Image, box_size: int = 8, thresh=1e-4, color: bool = True, lengths: bool = False, length_scale: float = 1.5, custom_kwargs: str = "", ordered: int = 0)
+
+    Napari-specific function for generating a Shapes layer with line representation of every nematic in the field.
+
+    :param img: Image layer.
+    :type img: Image
+    :param box_size: Optional. Size of boxes over which the field is averaged. Defaults to ``8``.
+    :type box_size: int
+    :param thresh: Optional. Nematic norm threshold. Norms are generally very low so this needs to be really low as well. Defaults to ``1e-4``.
+    :type thresh: float
+    :param color: Optional. Whether to use the magma cmap for the nematic field or not. Defaults to ``True``.
+    :type color: bool
+    :param lengths: Optional. Whether to scale bars with nematic magnitude or not. Defaults to ``False``.
+    :type lengths: bool
+    :param length_scale: Optional. Amount by which to scale the magnitude of the nematics for the scalable display. Defaults to ``1.5``.
+    :type length_scale: float
+    :param custom_kwargs: String of custom keyword arguments passed to ``viewer.add_shapes`` on layer generation. Keywords should be specified in the format ``arg:val`` seperated by ``-``, without spaces. Ignores the color argument explained previously. Defaults to ``""``.
+    :type custom_kwargs: str
+
+    Example:
+
+    >>> nemfield = of_script.draw_nematic_field_svg(img, box_size=8, custom_kwargs:'edge_color:angle-edge_colormap:hsv')
+
+
+.. py:function:: find_defects(img: Image, box_size: int = -1, thresh: float = -1, mode: str = "simplified")   
+    
+    Finds defects in the given image.
+
+    :param img: The Image layer to find defects in.
+    :type img: Image
+    :param box_size: Optional. The box size to use for defect computation. Defaults to ``draw_nematic_field_svg``'s default box size parameter.
+    :type box_size: int
+    :param thresh: Optional. The magnitude threshold to use for defect computation. Defaults to ``draw_nematic_field_svg``'s default threshold parameter.
+    :type thresh: float
+    :param mode: Optional. One of ``("squares", "simplified")``. Whether to represent the clusters as squares in an Image layer. Defaults to ``"simplified"``.
+    :type mode: str
+    :return: Tuple of shapes layers containing the potential defects.
+    :rtype: ``tuple[Shapes, Shapes]``

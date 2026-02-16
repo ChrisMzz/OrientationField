@@ -1,0 +1,6 @@
+nematicfield
+=============
+
+.. automodule:: orientationfield.nematicfield
+    :members:
+

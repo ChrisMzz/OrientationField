@@ -1,0 +1,14 @@
+OrientationField API Reference
+==============================
+
+The OrientationField package is split into three modules. 
+- The ``nematicfield`` module contains all the functions needed to compute the nematic field and works independently from napari.
+- The ``of_script`` module contains ``magicgui``-decorated functions that integrate nicely into the napari GUI. Defect computation is only supported through this module ; since it is very dependent on visualisation and proper parameter selection, we do not want to encourage users to try to compute defects automatically without having a way to visually check the output.
+- The ``of_widget`` module contains the ``OFWidget`` class that is used to generate the napari widget. This offers no additional functionality, and as OrientationField was written in a script-friendly way, we will not share the API reference for this module and rather redirect you to the internal function of ``of_script``.
+
+.. toctree::
+   :maxdepth: 1
+
+   api/nematicfield
+   api/of_script
+

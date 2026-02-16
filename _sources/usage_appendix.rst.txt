@@ -1,0 +1,30 @@
+Usage Appendix: Parameter Selection
+====================================
+
+A lot of parameters are hard to get right. That's why OrientationField is designed with *trial and error* computation in mind, where you can recompute 
+the nematic field very quickly, to make sure it captures the information you are looking for. Of course, we recommed you stick to a set of parameters 
+per experiment as to uphold FAIR principles.
+
+In this section we'll go through the computation parameters and provide a little explanation for each one.
+
+Structure Width
+--------------------
+
+You could guess the right structure width value based on your pixel size, if you know the size of your biological data very well.
+However, if the sizes of the objects in your image doesn't vary much, you might not encounter a situation where changing this parameter does too much.
+
+These such situations are where an image contains small structure whose orientation is different than that of the structure they form. Here is such an example:
+
+.. image:: images/W_fig.png
+   :scale: 150 %
+   :alt: W
+   :align: center
+
+Below is the resulting nematic field, after selecting a structure width of 2 on the left, or 64 on the right.
+
+.. image:: images/W_figsw.png
+   :scale: 150 %
+   :alt: Wsw
+   :align: center
+
+

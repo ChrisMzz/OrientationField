@@ -1,0 +1,40 @@
+Making a Layer of the nematic's angles in napari 
+================================================
+
+
+.. code-block::
+
+    import numpy as np
+    from tifffile import imread
+    import napari
+    from orientationfield import of_script
+    from orientationfield import nematicfield
+
+    viewer = napari.Viewer()
+
+    # load data
+    data = imread("path/to/data")
+
+    # define box sizes
+    bx, by = (4, 4)
+
+    # create layer (crop to make image size divisible by box size)
+    img = viewer.add_image(data[data.shape[0]%bx:, data.shape[1]%by:])
+
+    # compute nematic field of the image
+    of_script.compute_nematic_field(
+        img=img,
+        sigma=3
+    )
+
+    # extract per box angles
+    nem_field = img.metadata["nematic_field"]
+    angles = np.zeros_like(nem_field[:,:,0,0])
+    for box, (x1, x2, y1, y2) in nematicfield.tesselate(nem_field, bx, by):
+        angles[x1:x2, y1:y2] = nematicfield.extract(np.mean(box, (0, 1)))[1]
+
+    # add multiplicately blended HSV-colored layer of angles
+    multicolor_filter = viewer.add_image(angles, colormap="hsv", blending="multiplicative")
+
+
+    napari.run()

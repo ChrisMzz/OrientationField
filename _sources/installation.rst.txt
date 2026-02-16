@@ -1,0 +1,25 @@
+Installation
+=================
+
+Using an environment manager (recommended)
+-------------------------------------------
+
+- Create a ``conda`` environment using your environment manager. We recommend using Python 3.12 for OrientationField. With miniforge:
+
+.. code-block:: none
+
+    conda create -n orientation-field python=3.12
+    conda activate orientation-field
+
+
+- Install OrientationField using pip:
+
+.. code-block:: none
+
+    pip install git+https://github.com/ChrisMzz/OrientationField
+
+Since the primary focus of OrientationField is the GUI within napari, it has napari in its dependencies and will therefore install it if you don't have it already installed in your environment.
+Do note that napari versions older than 0.6 are no longer supported due to some API changes.
+
+
+
