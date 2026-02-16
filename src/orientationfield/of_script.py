@@ -7,6 +7,7 @@ from napari.layers import (
     Image,
     Points,
     Labels,
+    Shapes,
 )  # for magicgui and selection error handling
 from magicgui import magicgui
 from magicgui.widgets import FunctionGui
@@ -25,12 +26,11 @@ viewer = napari.current_viewer()
 # PR #100 from napari/magicgui linked in there refers to this feature added after https://github.com/pyapp-kit/magicgui/issues/383
 
 
-def nematic_field_properties():
-    """Boilerplate code to make properties of a nematic field Layer."""
+def nematic_field_properties() -> dict[str, list]:
     return {"Qxx": [], "Qxy": [], "norm": [], "angle": []}
 
 
-def hex_to_rgba(h):
+def hex_to_rgba(h:str) -> np.ndarray:
     if h[0] == "#":
         h = h[1:]
     if len(h) == 6:
@@ -40,8 +40,8 @@ def hex_to_rgba(h):
     )
 
 
-def proj_distance(p: tuple, l: tuple[tuple]):
-    """Distance between a point `p` and its projection on the extension of a line passing by two points, provided in a tuple `l`.
+def proj_distance(p: tuple, l: tuple[tuple]) -> float:
+    """Distance between a point ``p`` and its projection on the extension of a line passing by two points, provided in a tuple ``l``.
     Also known as the "perpendicular distance"."""
     (l1x, l1y), (l2x, l2y) = l
     length = np.sqrt((l2x - l1x) ** 2 + (l2y - l1y) ** 2)
@@ -53,8 +53,8 @@ def proj_distance(p: tuple, l: tuple[tuple]):
     )
 
 
-def rdp(points_list, eps):
-    """Internal, used by `rdp_polygon`."""
+def rdp(points_list:list[list], eps:float):
+    """Internal implementation of RDP algorithm used by ``rdp_polygon``."""
     dmax, index = 0, 0
     for i in range(1, len(points_list) - 1):
         d = proj_distance(points_list[i], (points_list[0], points_list[-1]))
@@ -69,10 +69,10 @@ def rdp(points_list, eps):
     )
 
 
-def rdp_polygon(polygon, eps):
+def rdp_polygon(polygon:list[np.ndarray], eps:float) -> np.ndarray:
     """Ramer-Douglas-Peucker algorithm for vertex reduction. Adapted to work on a polygon.
     Splits the polygon into two lines based on the "middle" vertex, and performs the classical algorithm
-    as described in [the wikipedia page](https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm#Pseudocode).
+    as described in `the wikipedia page <https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm#Pseudocode>`_.
 
     Args:
         polygon (list[np.ndarray]): List of points used to construct the polygon.
@@ -103,8 +103,8 @@ def compute_nematic_field(
     decolorize_axis: int = 2,
     normalize: bool = True,
     normalize_options: str = "total",
-):
-    """Compute nematic field of an Image layer `img`, and stores the result in layer metadata as a `img.data.shape+(2,2)`-array keyword "nematic_field".
+) -> bool:
+    """Compute nematic field of an Image layer ``img``, and stores the result in layer metadata as a ``img.data.shape+(2,2)``-array keyword ``nematic_field``.
 
     Args:
         img (Image): the Image layer.
@@ -119,10 +119,13 @@ def compute_nematic_field(
 
         normalize_options (str, optional): Type of normalization. 'total' normalization normalizes with respect to the whole image, all channels included (time included) 'per frame' normalizes each slice along the first axis individually. Defaults to 'total'.
 
+    Returns:
+        bool: Whether or not the field was computed.
+
     Example:
         >>> viewer.add_image(img_array) # img_array is a numpy array
         >>> img_layer = viewer.layers[-1] # get the corresponding Image layer
-        >>> nf_script.compute_nematic_field(img_layer, sigma=3.0, cutoff_ratio=2.0, decolorize=False)
+        >>> of_script.compute_nematic_field(img_layer, sigma=3.0, cutoff_ratio=2.0, decolorize=False)
         >>> nem_field = img_layer.metadata["nematic_field"]
 
     """
@@ -185,7 +188,7 @@ def compute_nematic_field(
     call_button="Preview Kernel",
 )
 def preview_kernel(**kwargs) -> np.ndarray:  # uses current values in GUI
-    """Display and/or return kernels for a given bandwidth and cutoff ratio. Unless specified, uses values in `compute_nematic_field` GUI.
+    """Display and/or return kernels for a given bandwidth and cutoff ratio. Unless specified, uses values in ``compute_nematic_field`` GUI.
 
     Kwargs:
         sigma (float): Bandwidth of the kernel.
@@ -232,8 +235,8 @@ def extract_nematic_points_layer(
     return_early: bool = False,
 ):
     """Generate a points layer for an Image layer, to save to a csv in a specified folder.
-    Points will be positioned in the center of boxes as they would be drawn in `draw_nematic_field`.
-    To manually set the box size (in case of exterior use of this function), use the `box_size` keyword argument.
+    Points will be positioned in the center of boxes as they would be drawn in ``draw_nematic_field``.
+    To manually set the box size (in case of exterior use of this function), use the ``box_size`` keyword argument.
 
     For video/multichannel image layers, this function will generate a video of points layers (which can be split later
     for batch processing).
@@ -358,16 +361,16 @@ def draw_nematic_field_svg(
 
     Args:
         img (Image): Image layer.
-        box_size (int): Size of boxes over which the field is averaged.
-        thresh (float): Nematic norm threshold. Norms are generally very low so this needs to be really low as well.
-        color (bool): Whether to use the magma cmap for the nematic field or not.
+        box_size (int): Size of boxes over which the field is averaged. Defaults to 8.
+        thresh (float): Nematic norm threshold. Norms are generally very low so this needs to be really low as well. Defaults to 1e-4.
+        color (bool): Whether to use the magma cmap for the nematic field or not. Defaults to True.
+        lengths (bool): Whether to scale bars with nematic magnitude or not. Defaults to False.
+        length_scale (float): Amount by which to scale the magnitude of the nematics for the scalable display. Defaults to 1.5.
         custom_kwargs (str): String of custom keyword arguments passed to `viewer.add_shapes` on layer generation. Keywords should be specified in the format 'arg:val' seperated by '-', without spaces. Ignores the color argument explained previously.
 
     Example:
-        >>> nemfield = of_script.draw_nematic_field_svg(img, box_size=8, custom_kwargs:'edge_color:angle-edge_colormap:hsv')
+        >>> nemfield = of_script.draw_nematic_field_svg(img, box_size=8, custom_kwargs='edge_color:angle-edge_colormap:hsv')
     """
-    # length_scale=1.5
-
     def _process_color(val):
         if val[0] == "#":
             return val
@@ -531,14 +534,17 @@ def draw_nematic_field_svg(
 )
 def cluster_defects(
     points: Points, thresh: float = -1, mode: str = "simplified"
-):
-    """Current implementation for finding potential defects.
+) -> tuple[Shapes, Shapes, list[Image]]:
+    """Finds potential defects in areas of low nematic magnitude.
 
     Args:
         points (Points): The Points layer, computed after potential masking.
+        thresh (float, optional): The magnitude threshold. Defaults to `draw_nematic_field_svg's` default parameter for the threshold.
+        mode (str, optional): One of `("squares", "simplified")`. Whether to represent the clusters as squares in an Image layer.
+        over the low magnitude boxes, or a polygonal shapes in a Shapes layer. Defaults to `"simplified"`.
 
     Returns:
-        Points: Points layer of defects.
+        tuple[Shapes, Shapes, list]: Tuple of potential clusters Shapes layer, edge clusters Shapes layer, and list of associated Image layers if these were computed.
     """
     rdp_eps = 1
     box_size = points.metadata["box_size"]
@@ -752,6 +758,15 @@ def cluster_defects(
 
 @magicgui(call_button="Box Intersection Defects", points={"label": "Points"})
 def box_intersection_defects(points: Points):
+    """Finds defects in corners of boxes.
+
+    Args:
+        points (Points): The Points layer, computed after potential masking.
+
+    Returns:
+        tuple[list, dict]: Tuple of list of ellipse information and dict of ellipse properties.
+    """
+
     name = points.name
     box_size = points.metadata["box_size"]
     neighbours = lambda r, c: [
@@ -831,6 +846,17 @@ def find_defects(
     thresh: float = -1,
     mode: str = "simplified",
 ):
+    """Finds defects in the given image.
+
+    Args:
+        img (Image): The Image layer to find defects in.
+        box_size (int, optional): The box size to use for defect computation. Defaults to ``draw_nematic_field_svg``'s default box size parameter.
+        thresh (float): The magnitude threshold to use for defect computation. Defaults to ``draw_nematic_field_svg``'s default threshold parameter.
+        mode (str): One of ``("squares", "simplified")``. Whether to represent the clusters as squares in an Image layer. Defaults to ``"simplified"``.
+        
+    Returns:
+        tuple[Shapes, Shapes]: Returns tuple of shapes layers containing the potential defects.
+    """
 
     if thresh == -1:
         thresh = draw_nematic_field_svg.__signature__.parameters[
@@ -1037,13 +1063,6 @@ def find_defects(
 
 
 # widget utility
-def get_help(widget):
-    """Return tooltip of a widget. Currently the same as `widget.tooltip`.
-
-    Args:
-        widget (str or FunctionGui): The widget or widget name
-    """
-
 
 @overload
 def get_help(widget: str):
@@ -1051,11 +1070,15 @@ def get_help(widget: str):
         print(f"Couldn't find widget called {widget}.")
         return
     return tooltips[widget]
-
-
 @overload
 def get_help(widget: FunctionGui):
     return widget.tooltip
+def get_help(widget):
+    """Return tooltip of a widget. Same as ``widget.tooltip``.
+
+    Args:
+        widget (str or FunctionGui): The widget or widget name
+    """
 
 
 functions = [
